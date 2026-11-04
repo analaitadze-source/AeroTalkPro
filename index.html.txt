@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroTalk Pro - Aviation Radiotelephony Simulator</title>
+    <!-- Tailwind CSS for modern, flexible styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom radio static effect simulating aviation headsets */
+        .radio-static {
+            position: relative;
+        }
+        .radio-static::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-850 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-md">
+        <div class="flex items-center space-x-3">
+            <svg class="w-8 h-8 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white flex items-center">
+                    AeroTalk Pro <span class="ml-2 text-xs font-semibold px-2 py-0.5 bg-sky-500/20 text-sky-400 rounded border border-sky-500/30">ICAO RTF</span>
+                </h1>
+                <p class="text-xs text-slate-400">Radiotelephony Phraseology &amp; Proficiency Workspace</p>
+                <p class="text-xs text-slate-400 mt-0.5">Ana Laitadze, creator &amp; developer, 4.11.2026</p>
+            </div>
+        </div>
+
+        <!-- Performance / Marks Dashboard -->
+        <div class="flex items-center space-x-6">
+            <div class="text-center">
+                <span class="block text-xs uppercase tracking-wider text-slate-400">Total Marks</span>
+                <span id="global-score" class="text-lg font-bold mono-font text-emerald-400">0</span>
+            </div>
+            <div class="text-center border-l border-slate-700 pl-6">
+                <span class="block text-xs uppercase tracking-wider text-slate-400">Accuracy</span>
+                <span id="global-accuracy" class="text-lg font-bold mono-font text-sky-400">100%</span>
+            </div>
+            <div class="text-center border-l border-slate-700 pl-6">
+                <span class="block text-xs uppercase tracking-wider text-slate-400">Completed</span>
+                <span id="global-progress" class="text-lg font-bold mono-font text-purple-400">0 / 50</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sidebar: Scenario List -->
+        <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col h-[calc(100vh-73px)]">
+            <div class="p-4 border-b border-slate-800 bg-slate-900/50">
+                <label for="category-filter" class="sr-only">Filter Scenarios</label>
+                <select id="category-filter" onchange="filterScenarios()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <option value="all">All Scenarios (Progressive Curriculum)</option>
+                    <option value="Routine">Routine Operations (25)</option>
+                    <option value="Non-Routine">Non-Routine / Emergency (25)</option>
+                </select>
+            </div>
+            
+            <!-- Dynamic Menu Items Scrollable Area -->
+            <nav id="scenario-list" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                <!-- Dynamically populated via JS -->
+            </nav>
+        </aside>
+
+        <!-- Main Content Interaction Space -->
+        <main class="flex-1 bg-slate-950 p-6 flex flex-col overflow-y-auto h-[calc(100vh-73px)]">
+            
+            <!-- Active Scenario Overview Card -->
+            <div class="bg-slate-900 rounded-xl p-5 border border-slate-800 shadow-xl mb-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span id="active-tag" class="text-xs font-semibold px-2 py-1 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase tracking-wider">Routine</span>
+                        <h2 id="active-title" class="text-2xl font-bold text-white mt-2">Scenario Title Placeholder</h2>
+                        <p id="active-desc" class="text-slate-400 text-sm mt-1">Detailed scenario operational context.</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="changeVoiceSettings()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg text-xs font-medium border border-slate-700 flex items-center space-x-1 transition">
+                            <span>⚙️ Voice Configuration</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Tabs Layout -->
+            <div class="flex border-b border-slate-800 space-x-4 mb-6">
+                <button onclick="switchTab('dialogue')" id="tab-dialogue" class="py-2.5 px-4 font-semibold text-sm border-b-2 border-sky-500 text-sky-400 focus:outline-none transition">1. Read &amp; Listen</button>
+                <button onclick="switchTab('gapfill')" id="tab-gapfill" class="py-2.5 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition">2. Phraseology Gap-Fill</button>
+                <button onclick="switchTab('mixed')" id="tab-mixed" class="py-2.5 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition">3. Mixed Conversation</button>
+                <button onclick="switchTab('wordorder')" id="tab-wordorder" class="py-2.5 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition">4. Transmission Syntax</button>
+            </div>
+
+            <!-- TAB 1: READ & LISTEN VIEW -->
+            <div id="panel-dialogue" class="tab-panel space-y-6">
+                <!-- Audio Controls Row -->
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <button onclick="playFullDialogue()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-5 rounded-lg text-sm flex items-center space-x-2 transition shadow-lg shadow-emerald-900/20">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <span>Transmit Full Dialogue</span>
+                        </button>
+                        <button onclick="stopAudio()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium py-2 px-4 rounded-lg text-sm border border-slate-700 transition">
+                            Stop Playback
+                        </button>
+                    </div>
+                    <div class="text-xs text-slate-400 flex items-center space-x-2">
+                        <span class="inline-block w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span>Web Speech Engine Active ("Point" Rule Implemented)</span>
+                    </div>
+                </div>
+
+                <!-- Live Conversation Stack -->
+                <div id="dialogue-box" class="space-y-4 max-w-4xl mx-auto">
+                    <!-- Loaded dynamically with Pilot/ATC blocks -->
+                </div>
+            </div>
+
+            <!-- TAB 2: SENTENCE GAP FILL -->
+            <div id="panel-gapfill" class="tab-panel hidden max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+                <h3 class="text-lg font-bold text-white mb-2">Fill the Phraseology Gap</h3>
+                <p class="text-slate-400 text-sm mb-6">Select the correct standard ICAO functional word or phrase to safely complete the radio transmission protocol.</p>
+                
+                <div class="bg-slate-950 border border-slate-800 rounded-lg p-5 mb-6 radio-static min-h-[80px] flex items-center">
+                    <p id="gapfill-sentence" class="text-lg tracking-wide leading-relaxed font-medium text-slate-200 mono-font"></p>
+                </div>
+
+                <div id="gapfill-options" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                    <!-- 4 options populated via JS -->
+                </div>
+
+                <div id="gapfill-feedback" class="hidden rounded-lg p-4 mb-4 flex items-center space-x-3"></div>
+            </div>
+
+            <!-- TAB 3: MIXED CONVERSATION -->
+            <div id="panel-mixed" class="tab-panel hidden max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+                <h3 class="text-lg font-bold text-white mb-2">Reconstruct the Transmission Sequence</h3>
+                <p class="text-slate-400 text-sm mb-6">ATC and Pilot transmissions are completely scrambled. Click the components in their logical chronological sequence according to aviation operational workflow guidelines.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Left: Scrambled Pool -->
+                    <div>
+                        <h4 class="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Scrambled Elements</h4>
+                        <div id="mixed-pool" class="space-y-2"></div>
+                    </div>
+                    <!-- Right: Arranged Timeline -->
+                    <div>
+                        <h4 class="text-xs uppercase tracking-wider text-sky-400 font-bold mb-2">Your Chronological Order</h4>
+                        <div id="mixed-target" class="space-y-2 border-2 border-dashed border-slate-800 rounded-xl p-4 min-h-[200px] bg-slate-950/50 flex flex-col justify-start"></div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-between items-center border-t border-slate-800 pt-4">
+                    <button onclick="resetMixedQuiz()" class="text-slate-400 hover:text-slate-200 text-sm transition">Reset Sequence</button>
+                    <button onclick="checkMixedQuiz()" class="bg-sky-600 hover:bg-sky-500 text-white font-medium py-2 px-5 rounded-lg text-sm transition">Verify Sequence Accuracy</button>
+                </div>
+                <div id="mixed-feedback" class="hidden rounded-lg p-4 mt-4"></div>
+            </div>
+
+            <!-- TAB 4: WORD ORDER SYNTAX -->
+            <div id="panel-wordorder" class="tab-panel hidden max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl">
+                <h3 class="text-lg font-bold text-white mb-2">Aviation Transmission Syntax Assembly</h3>
+                <p class="text-slate-400 text-sm mb-4">A single critical radio transmission is fragmented below. Arrange the phraseology pieces correctly to maintain precise structural syntax.</p>
+                
+                <div id="wordorder-speaker-badge" class="mb-3"></div>
+                
+                <!-- Workspace for Unscrambling -->
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-5 min-h-[100px] mb-6 flex flex-wrap gap-2 items-center" id="wordorder-target">
+                    <!-- Constructed word chips go here -->
+                </div>
+
+                <!-- Word Source Pool -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-4 mb-6">
+                    <span class="block text-xs text-slate-400 mb-2 uppercase tracking-wider">Available Chips:</span>
+                    <div id="wordorder-pool" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="flex justify-between items-center border-t border-slate-800 pt-4">
+                    <button onclick="resetWordOrderQuiz()" class="text-slate-400 hover:text-slate-200 text-sm transition">Clear Sequence</button>
+                    <button onclick="checkWordOrderQuiz()" class="bg-purple-600 hover:bg-purple-500 text-white font-medium py-2 px-5 rounded-lg text-sm transition">Validate Sentence Syntax</button>
+                </div>
+                <div id="wordorder-feedback" class="hidden rounded-lg p-4 mt-4"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Voice Profile Customization Modal Window -->
+    <div id="voice-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-xl p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-2">Aviation Voice Synthesizer Configuration</h3>
+            <p class="text-xs text-slate-400 mb-4">Map available runtime text-to-speech audio outputs to unique speaker paths for immersive simulation training.</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="atc-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Air Traffic Control Voice Profile</label>
+                    <select id="atc-voice-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500"></select>
+                </div>
+                <div>
+                    <label for="pilot-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Pilot/Flight Deck Voice Profile</label>
+                    <select id="pilot-voice-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="voice-pitch" class="block text-xs text-slate-400 mb-1">Radio Transmission Pitch</label>
+                        <input id="voice-pitch" type="range" min="0.5" max="1.5" step="0.1" value="0.95" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div>
+                        <label for="voice-rate" class="block text-xs text-slate-400 mb-1">Transmission Speed (WPM)</label>
+                        <input id="voice-rate" type="range" min="0.7" max="1.3" step="0.1" value="1.0" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end space-x-2">
+                <button onclick="closeVoiceModal()" class="bg-sky-600 hover:bg-sky-500 text-white font-medium py-2 px-4 rounded-lg text-sm transition">Save Configuration Profiles</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN SIMULATOR APPLICATION SCRIPT ENGINE -->
+    <script>
+        // Database of 50 Scenarios sorted in structural progression from easy to difficult
+        const SCENARIOS = [
+            // LEVEL 1: STANDARD ROUTINE GROUND CONFIGURATIONS & PRE-FLIGHT
+            { id: 1, type: "Routine", title: "ATIS Broadcaster Acknowledgement", desc: "Confirming reception of local broadcast meteorological codes.", phrase: "information", dialog: [ { s: "Pilot", t: "Delivery, FastAir 245, with information Charlie, request en-route tracking profile." }, { s: "ATC", t: "FastAir 245, clearance stands valid, info Charlie current." } ], gap: { q: "Delivery, FastAir 245, with [___] Charlie, request tracking profile.", a: "information", opts: ["information", "broadcast", "weather packet", "report alpha"] }, syntax: { s: "Pilot", words: ["with", "information", "Charlie", "request", "clearance"] } },
+            { id: 2, type: "Routine", title: "IFR Clearance Delivery", desc: "Requesting en-route clearance before engine start.", phrase: "cleared to", dialog: [ { s: "Pilot", t: "Alpha Delivery, FastAir 245, IFR to Paris Charles de Gaulle, information Bravo, request clearance." }, { s: "ATC", t: "FastAir 245, Alpha Delivery, cleared to Paris via flight plan route, CLIMB VIA SID, departure runway 24R, initial altitude 5000 feet, squawk 4321." }, { s: "Pilot", t: "Cleared to Paris via flight plan route, climb via SID, departure runway 24R, initial altitude 5000 feet, squawk 4321, FastAir 245." }, { s: "ATC", t: "FastAir 245, readback correct. Contact Ground 121.8 when ready for pushback." } ], gap: { q: "FastAir 245, Alpha Delivery, [___] Paris via flight plan route, climb via SID.", a: "cleared to", opts: ["cleared to", "proceed to", "approved routing", "fly direct"] }, syntax: { s: "ATC", words: ["cleared", "via", "flight", "plan", "route", "squawk", "4321"] } },
+            { id: 3, type: "Routine", title: "Squawk Identity Transponder Setup", desc: "Setting distinct transponder system configurations for secondary target returns.", phrase: "squawk", dialog: [ { s: "ATC", t: "FastAir 245, reset transponder, squawk 5261." }, { s: "Pilot", t: "Squawk 5261, FastAir 245." } ], gap: { q: "FastAir 245, reset transponder, [___] 5261.", a: "squawk", opts: ["squawk", "set secondary", "code out", "flash indicator"] }, syntax: { s: "ATC", words: ["reset", "transponder", "squawk", "5261"] } },
+            { id: 4, type: "Routine", title: "Pushback Approval", desc: "Requesting movement from gate.", phrase: "approved", dialog: [ { s: "Pilot", t: "Ground, FastAir 245, gate A12, request pushback." }, { s: "ATC", t: "FastAir 245, Ground, pushback approved, face South." }, { s: "Pilot", t: "Pushback approved, face South, FastAir 245." } ], gap: { q: "FastAir 245, Ground, pushback [___], face South.", a: "approved", opts: ["approved", "cleared", "copied", "affirmative"] }, syntax: { s: "ATC", words: ["pushback", "approved", "face", "South"] } },
+            { id: 5, type: "Routine", title: "Taxi Instructions", desc: "Navigating airport movement areas to holding point.", phrase: "hold short of", dialog: [ { s: "Pilot", t: "Ground, FastAir 245, ready to taxi." }, { s: "ATC", t: "FastAir 245, taxi via Taxiway Alpha and Bravo, hold short of runway 24R." }, { s: "Pilot", t: "Taxi via Alpha and Bravo, hold short of runway 24R, FastAir 245." } ], gap: { q: "FastAir 245, taxi via Alpha and Bravo, [___] runway 24R.", a: "hold short of", opts: ["hold short of", "cross", "line up", "continue past"] }, syntax: { s: "ATC", words: ["taxi", "via", "Alpha", "hold", "short", "of", "runway", "24R"] } },
+            { id: 6, type: "Routine", title: "Line Up and Wait", desc: "Entering active runway without immediate takeoff clearance.", phrase: "line up and wait", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, holding short runway 24R." }, { s: "ATC", t: "FastAir 245, Tower, line up and wait runway 24R." }, { s: "Pilot", t: "Line up and wait runway 24R, FastAir 245." } ], gap: { q: "FastAir 245, Tower, [___] runway 24R.", a: "line up and wait", opts: ["line up and wait", "cleared for takeoff", "position and hold", "taxi past hold line"] }, syntax: { s: "Pilot", words: ["Line", "up", "and", "wait", "runway", "24R", "FastAir", "245"] } },
+
+            // LEVEL 2: ROUTINE DEPARTURE, CLIMB, AND TRANSITION FLOWS
+            { id: 7, type: "Routine", title: "Takeoff Clearance", desc: "Departure approval on active runway.", phrase: "cleared for takeoff", dialog: [ { s: "Pilot", t: "FastAir 245, lining up runway 24R." }, { s: "ATC", t: "FastAir 245, wind 250 degrees at 12 knots, runway 24R, cleared for takeoff." }, { s: "Pilot", t: "Runway 24R, cleared for takeoff, FastAir 245." } ], gap: { q: "FastAir 245, wind 250 degrees at 12 knots, runway 24R, [___].", a: "cleared for takeoff", opts: ["cleared for takeoff", "approved for departure", "go for departure", "takeoff at discretion"] }, syntax: { s: "ATC", words: ["runway", "24R", "cleared", "for", "takeoff", "wind", "250", "at", "12"] } },
+            { id: 8, type: "Routine", title: "Initial Altitude Climb", desc: "Reporting passing altitudes during departure phase.", phrase: "climbing to", dialog: [ { s: "Pilot", t: "Departure, FastAir 245, passing 2000 feet climbing to 5000 feet via SID." }, { s: "ATC", t: "FastAir 245, Radar contact, climb and maintain Flight Level 120." }, { s: "Pilot", t: "Climb and maintain Flight Level 120, FastAir 245." } ], gap: { q: "Departure, FastAir 245, passing 2000 feet [___] 5000 feet via SID.", a: "climbing to", opts: ["climbing to", "maintaining", "leveling at", "tracking"] }, syntax: { s: "ATC", words: ["climb", "and", "maintain", "Flight", "Level", "120"] } },
+            { id: 9, type: "Routine", title: "En-Route Frequency Handover", desc: "Transitioning between adjacent radar control frequencies.", phrase: "contact", dialog: [ { s: "ATC", t: "FastAir 245, contact Departure on 124.5." }, { s: "Pilot", t: "124.5, FastAir 245, goodbye." } ], gap: { q: "FastAir 245, [___] Departure on 124.5.", a: "contact", opts: ["contact", "monitor", "call", "switch"] }, syntax: { s: "ATC", words: ["contact", "Departure", "on", "124.5"] } },
+            { id: 10, type: "Routine", title: "Transition Level Altimeter Calibration", desc: "Updating pressure tracking referencing standard atmospheric datum.", phrase: "QNH", dialog: [ { s: "ATC", t: "FastAir 245, descend to 4000 feet, QNH 1013." }, { s: "Pilot", t: "Descend to 4000 feet, QNH 1013, FastAir 245." } ], gap: { q: "FastAir 245, descend to 4000 feet, [___] 1013.", a: "QNH", opts: ["QNH", "Altimeter", "Setting", "Inches"] }, syntax: { s: "ATC", words: ["descend", "to", "4000", "feet", "QNH", "1013"] } },
+
+            // LEVEL 3: ROUTINE EN-ROUTE CRUISE ENVIROMENTS & NAVIGATION CONTROLS
+            { id: 11, type: "Routine", title: "Step Climb to Cruise", desc: "Requesting high altitude cruise flight adjustments.", phrase: "maintain Flight Level", dialog: [ { s: "Pilot", t: "Control, FastAir 245, request Flight Level 360." }, { s: "ATC", t: "FastAir 245, climb and maintain Flight Level 360." }, { s: "Pilot", t: "Climb and maintain Flight Level 360, FastAir 245." } ], gap: { q: "FastAir 245, climb and [___] 360.", a: "maintain Flight Level", opts: ["maintain Flight Level", "level at altitude", "hold vertical profile", "cruise at"] }, syntax: { s: "ATC", words: ["climb", "and", "maintain", "Flight", "Level", "360"] } },
+            { id: 12, type: "Routine", title: "Direct Routing Clearance", desc: "Accepting a shortcut navigational fix from radar control.", phrase: "fly direct to", dialog: [ { s: "ATC", t: "FastAir 245, clear of traffic, fly direct to KANIK." }, { s: "Pilot", t: "Direct KANIK, FastAir 245." } ], gap: { q: "FastAir 245, clear of traffic, [___] KANIK.", a: "fly direct to", opts: ["fly direct to", "proceed towards", "intercept tracking to", "cleared direct route"] }, syntax: { s: "ATC", words: ["fly", "direct", "to", "KANIK"] } },
+            { id: 13, type: "Routine", title: "Speed Control Adjustment", desc: "ATC requests dynamic cruise velocity modifications for airspace spacing.", phrase: "maintain speed", dialog: [ { s: "ATC", t: "FastAir 245, reduce speed to Mach 0.78 for spacing." }, { s: "Pilot", t: "Reducing to Mach 0.78, FastAir 245." } ], gap: { q: "FastAir 245, reduce and [___] Mach 0.78 for spacing.", a: "maintain speed", opts: ["maintain speed", "indicate velocity", "lock rate", "hold mach"] }, syntax: { s: "ATC", words: ["reduce", "speed", "to", "Mach", "0.78"] } },
+            { id: 14, type: "Routine", title: "Weather Update Request", desc: "Pilot inquiries regarding adverse cell updates en route.", phrase: "report conditions", dialog: [ { s: "Pilot", t: "Control, FastAir 245, request latest weather for destination." }, { s: "ATC", t: "FastAir 245, destination reporting wind calm, visibility greater than 10 kilometers, ceiling broken at 4000 feet." }, { s: "Pilot", t: "Copied, thank you, FastAir 245." } ], gap: { q: "FastAir 245, destination [___] wind calm, visibility unrestricted.", a: "reporting conditions", opts: ["reporting conditions", "has current profile", "showing data", "weather state"] } , syntax: { s: "ATC", words: ["destination", "reporting", "wind", "calm", "visibility", "greater", "than", "10", "kilometers"] }},
+            { id: 15, type: "Routine", title: "Oceanic Position Reporting", desc: "Transmitting coordinates across radarless oceanic tracks.", phrase: "estimating", dialog: [ { s: "Pilot", t: "Shanwick Radio, FastAir 245, position 55 North 20 West at 1420, Flight Level 360, estimating 55 North 30 West at 1510." }, { s: "ATC", t: "FastAir 245, Shanwick copies position report." } ], gap: { q: "FastAir 245, Flight Level 360, [___] 55 North 30 West at 1510.", a: "estimating", opts: ["estimating", "calculating", "next point", "arriving"] }, syntax: { s: "Pilot", words: ["position", "55", "North", "Flight", "Level", "360", "estimating"] } },
+
+            // LEVEL 4: ROUTINE ARRIVAL, APPROACH LAYOUTS & RE-ALIGMENTS
+            { id: 16, type: "Routine", title: "Descent Profile Clearance", desc: "Initiating step down descent toward terminal terminal tracking areas.", phrase: "descend to", dialog: [ { s: "ATC", t: "FastAir 245, cleared descent to Flight Level 100." }, { s: "Pilot", t: "Descend to Flight Level 100, FastAir 245." } ], gap: { q: "FastAir 245, cleared [___] Flight Level 100.", a: "descend to", opts: ["descend to", "drop level", "target altitude", "vertical shift"] }, syntax: { s: "ATC", words: ["cleared", "descent", "to", "Flight", "Level", "100"] } },
+            { id: 17, type: "Routine", title: "Entering Holding Pattern", desc: "Aviation delays require holding at designated navigational intersections.", phrase: "hold at", dialog: [ { s: "ATC", t: "FastAir 245, expect arrival delay, hold at LND VOR, Flight Level 140, inbound course 260, right turns." }, { s: "Pilot", t: "Hold at LND VOR, Flight Level 140, FastAir 245." } ], gap: { q: "FastAir 245, expect arrival delay, [___] LND VOR, Flight Level 140.", a: "hold at", opts: ["hold at", "proceed over", "orbit above", "circle intercept"] }, syntax: { s: "ATC", words: ["hold", "at", "LND", "VOR", "Flight", "Level", "140"] } },
+            { id: 18, type: "Routine", title: "Radar Vectors onto Final Approach", desc: "ATC provides alignment vectors toward landing corridors.", phrase: "fly heading", dialog: [ { s: "ATC", t: "FastAir 245, turn right heading 210, vectors for ILS runway 24R final course." }, { s: "Pilot", t: "Right heading 210, FastAir 245." } ], gap: { q: "FastAir 245, turn right and [___] 210, vectors for ILS runway 24R.", a: "fly heading", opts: ["fly heading", "steer course", "track vector", "turn azimuth"] }, syntax: { s: "ATC", words: ["turn", "right", "heading", "210", "vectors", "for", "ILS"] } },
+            { id: 19, type: "Routine", title: "ILS Intercept Authorization", desc: "Authorization to capture localized approach guidance signals.", phrase: "cleared ILS approach", dialog: [ { s: "ATC", t: "FastAir 245, 4 miles from localizer, maintain 3000 feet until established, cleared ILS runway 24R approach." }, { s: "Pilot", t: "Maintain 3000 until established, cleared ILS runway 24R approach, FastAir 245." } ], gap: { q: "FastAir 245, maintain 3000 feet until established, [___] runway 24R.", a: "cleared ILS approach", opts: ["cleared ILS approach", "approved descent tracking", "intercept capture glide", "free to lock"] }, syntax: { s: "ATC", words: ["cleared", "ILS", "runway", "24R", "approach"] } },
+            { id: 20, type: "Routine", title: "Visual Approach Conversion", desc: "Pilot transitions from instrument tracking to absolute visual references.", phrase: "report runway in sight", dialog: [ { s: "Pilot", t: "Approach, FastAir 245, have the airfield in sight, request visual approach." }, { s: "ATC", t: "FastAir 245, cleared visual approach runway 24R, contact Tower 118.1." }, { s: "Pilot", t: "Cleared visual approach runway 24R, switching to Tower, FastAir 245." } ], gap: { q: "FastAir 245, cleared visual approach runway 24R, [___] 118.1.", a: "contact Tower", opts: ["contact Tower", "monitor frequency", "call local", "hail down"] }, syntax: { s: "Pilot", words: ["airfield", "in", "sight", "request", "visual", "approach"] } },
+
+            // LEVEL 5: ROUTINE LANDING CHECKLISTS, TERMINATIONS & INTERRUPT PROFILES
+            { id: 21, type: "Routine", title: "Landing Clearance", desc: "Final touchdown approval from local tower controllers.", phrase: "cleared to land", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, established final runway 24R." }, { s: "ATC", t: "FastAir 245, wind 240 degrees at 10 knots, runway 24R, cleared to land." }, { s: "Pilot", t: "Runway 24R, cleared to land, FastAir 245." } ], gap: { q: "FastAir 245, wind 240 degrees at 10 knots, runway 24R, [___].", a: "cleared to land", opts: ["cleared to land", "approved touchdown", "landing permitted", "continue past numbers"] }, syntax: { s: "ATC", words: ["wind", "240", "at", "10", "runway", "24R", "cleared", "to", "land"] } },
+            { id: 22, type: "Routine", title: "Vacating the Active Runway", desc: "Reporting clearing of active arrival corridor to surface controllers.", phrase: "runway vacated", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, runway 24R vacated." }, { s: "ATC", t: "FastAir 245, roger, contact Ground on 121.8." }, { s: "Pilot", t: "121.8, FastAir 245." } ], gap: { q: "Tower, FastAir 245, [___] runway 24R.", a: "runway vacated", opts: ["runway vacated", "clear of operations", "off active track", "on taxiway bounds"] }, syntax: { s: "Pilot", words: ["runway", "24R", "vacated", "FastAir", "245"] } },
+            { id: 23, type: "Routine", title: "Missed Approach / Go-Around", desc: "Aborting a landing checklist sequence safely to re-enter pattern airspace.", phrase: "going around", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, un-stabilized approach, going around." }, { s: "ATC", t: "FastAir 245, roger, climb and maintain 3000 feet, fly runway heading." }, { s: "Pilot", animate: true, t: "Climb and maintain 3000 feet, runway heading, FastAir 245." } ], gap: { q: "Tower, FastAir 245, un-stabilized approach, [___].", a: "going around", opts: ["going around", "aborting tracking", "climbing away", "missed field"] }, syntax: { s: "Pilot", words: ["un-stabilized", "approach", "going", "around", "FastAir", "245"] } },
+            { id: 24, type: "Routine", title: "Taxi Destination Routing to Gate", desc: "Receiving terminal apron docking instructions.", phrase: "taxi to gate", dialog: [ { s: "Pilot", t: "Ground, FastAir 245, clear of runway 24R, request taxi to gate." }, { s: "ATC", t: "FastAir 245, taxi to gate A12 via Taxiway Charlie." }, { s: "Pilot", t: "Gate A12 via Charlie, FastAir 245." } ], gap: { q: "FastAir 245, [___] A12 via Taxiway Charlie.", a: "taxi to gate", opts: ["taxi to gate", "proceed into ramp", "dock entry approved", "continue line profile"] }, syntax: { s: "ATC", words: ["taxi", "to", "gate", "A12", "via", "Charlie"] } },
+            { id: 25, type: "Routine", title: "Final Gate Shut Down Report", desc: "Terminating operational telemetry communications on blocking in.", phrase: "shut down", dialog: [ { s: "Pilot", t: "Ground, FastAir 245, blocked into gate A12, engines shutdown. Request logoff." }, { s: "ATC", t: "FastAir 245, logged off at 1645. Have a good day." }, { s: "Pilot", t: "Good day, FastAir 245." } ], gap: { q: "Ground, FastAir 245, blocked into gate A12, engines [___].", a: "shutdown", opts: ["shutdown", "terminated", "secured", "cutoff"] }, syntax: { s: "Pilot", words: ["engines", "shutdown", "request", "logoff", "FastAir", "245"] } },
+
+            // LEVEL 6: NON-ROUTINE ABNORMALITIES & ENVIRONMENTAL MODIFICATIONS (MINOR ANOMALIES)
+            { id: 26, type: "Non-Routine", title: "Loss of Two-Way Communications (NORDO)", desc: "Transponder code assignment for radio failure management.", phrase: "squawk 7600", dialog: [ { s: "ATC", t: "FastAir 245, if you read, squawk 7600, ident." }, { s: "Pilot", t: "[Setting transponder to 7600 to signify radio receiver/transmitter failure]" } ], gap: { q: "FastAir 245, if you receive transmissions but cannot reply, [___].", a: "squawk 7600", opts: ["squawk 7600", "squawk 7700", "flash emergency ident", "transmit emergency codes"] }, syntax: { s: "ATC", words: ["if", "you", "read", "squawk", "7600"] } },
+            { id: 27, type: "Non-Routine", title: "High-Power Ground Laser Distraction", desc: "Cockpit visual impairment by ground-based target emission hazards.", phrase: "laser illumination", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, sustained green laser illumination from 2 miles north of final approach tracking corridor." }, { s: "ATC", t: "FastAir 245, copied, alerting local ground security enforcement authorities." } ], gap: { q: "Tower, FastAir 245, sustained green [___] from 2 miles north.", a: "laser illumination", opts: ["laser illumination", "beam tracking event", "light tracking hazard", "radiation target strike"] }, syntax: { s: "Pilot", words: ["sustained", "green", "laser", "illumination", "from", "final"] } },
+            { id: 28, type: "Non-Routine", title: "Main Cargo Hold Door Warning", desc: "Structural integrity sensor fault indicators alert in flight.", phrase: "door unlock warning", dialog: [ { s: "Pilot", t: "Control, FastAir 245, main cargo door unlock warning light active, request immediate descent and return." }, { s: "ATC", t: "FastAir 245, vector approved, turn left heading 360, descend 6000 feet." } ], gap: { q: "Control, FastAir 245, main cargo [___] light active, request return.", a: "door unlock warning", opts: ["door unlock warning", "latch structural fault", "seal integrity decompression", "hatch opening alert"] }, syntax: { s: "Pilot", words: ["main", "cargo", "door", "unlock", "warning", "light", "active"] } },
+            { id: 29, type: "Non-Routine", title: "Convective Storm Cell Avoidance", desc: "Requesting track deviation from planned route to steer clear of heavy weather.", phrase: "deviate heading", dialog: [ { s: "Pilot", t: "Control, FastAir 245, request left deviation 20 degrees for severe convective storm avoidance." }, { s: "ATC", t: "FastAir 245, deviation 20 degrees left approved, report when able to rejoin route." } ], gap: { q: "Control, FastAir 245, request left [___] 20 degrees for storm avoidance.", a: "deviation", opts: ["deviation", "offset track", "vector escape", "lateral turn"] }, syntax: { s: "Pilot", words: ["request", "left", "deviation", "20", "degrees", "storm", "avoidance"] } },
+            { id: 30, type: "Non-Routine", title: "Severe Clear Air Turbulence", desc: "Structural limit loading forces require abrupt flight level adjustment authorization.", phrase: "severe turbulence", dialog: [ { s: "Pilot", t: "Control, FastAir 245, encountering severe turbulence, request immediate altitude change to Flight Level 320." }, { s: "ATC", t: "FastAir 245, climb immediate Flight Level 320, traffic clear." } ], gap: { q: "Control, FastAir 245, encountering [___], request immediate altitude change.", a: "severe turbulence", opts: ["severe turbulence", "wind displacement spike", "shear boundary crossing", "convective chop forces"] }, syntax: { s: "Pilot", words: ["encountering", "severe", "turbulence", "request", "immediate", "altitude", "change"] } },
+            { id: 31, type: "Non-Routine", title: "Unsafe Landing Gear Indication", desc: "Landing system locking mechanisms fail to show positive structural engagement.", phrase: "gear unsafe", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, getting nose gear unsafe light indication. Requesting low pass over tower structure for visual check." }, { s: "ATC", t: "FastAir 245, approved low pass runway 24R, maintain 500 feet altitude." } ], gap: { q: "Tower, FastAir 245, getting nose [___] indication. Requesting tower visual sweep pass.", a: "gear unsafe", opts: ["gear unsafe", "locking breakdown", "extension fault", "strut drop anomaly"] }, syntax: { s: "Pilot", words: ["getting", "nose", "gear", "unsafe", "light", "indication"] } },
+
+            // LEVEL 7: NON-ROUTINE OPERATIONAL HAZARDS & ACTIVE THREAT MITIGATION (URGENT PARSING)
+            { id: 32, type: "Non-Routine", title: "Active Runway Incursion Breach", desc: "Unassigned physical unit asset targets entering active operational lanes.", phrase: "runway incursion", dialog: [ { s: "ATC", t: "FastAir 245, cancel takeoff clearance! Hold position immediately, vehicle crossing down track!" }, { s: "Pilot", t: "Holding position, canceling takeoff, FastAir 245." } ], gap: { q: "FastAir 245, [___]! Hold position immediately, vehicle crossing down track!", a: "cancel takeoff clearance", opts: ["cancel takeoff clearance", "abort your acceleration", "brake hard profile", "freeze tracking state"] }, syntax: { s: "ATC", words: ["cancel", "takeoff", "clearance", "hold", "position", "immediately"] } },
+            { id: 33, type: "Non-Routine", title: "On-Board Medical Emergency", desc: "Passenger health critical event requiring immediate diversion protocol.", phrase: "medical emergency", dialog: [ { s: "Pilot", t: "Control, FastAir 245, request diversion to Frankfurt due to critical medical emergency onboard with an unresponsive passenger." }, { s: "ATC", t: "FastAir 245, cleared direct Frankfurt, descend to Flight Level 140, emergency response services alerted." } ], gap: { q: "Control, FastAir 245, request diversion to Frankfurt due to critical [___] onboard.", a: "medical emergency", opts: ["medical emergency", "passenger trauma event", "personnel triage scenario", "cabin medical status"] }, syntax: { s: "Pilot", words: ["diversion", "to", "Frankfurt", "due", "to", "medical", "emergency"] } },
+            { id: 34, type: "Non-Routine", title: "Unruly Cabin Passenger Threat", desc: "Cabin disturbance compromising cockpit safety profiles.", phrase: "interference threat", dialog: [ { s: "Pilot", t: "Center, FastAir 245, passenger attempting breach of flight deck, requesting law enforcement tracking on landing touchdown." }, { s: "ATC", t: "FastAir 245, Roger, priority vectors inbound, police response units positioned on apron sector." } ], gap: { q: "Center, FastAir 245, passenger attempting breach of flight deck, requesting [___] monitoring.", a: "law enforcement", opts: ["law enforcement", "ground marshal support", "apron physical extraction", "terminal defense elements"] }, syntax: { s: "Pilot", words: ["passenger", "attempting", "breach", "requesting", "law", "enforcement"] } },
+            { id: 35, type: "Non-Routine", title: "Minimum Fuel Advisory State", desc: "Advance warning to tracking facilities that fuel reserves are nearing limits.", phrase: "minimum fuel", dialog: [ { s: "Pilot", t: "Approach, FastAir 245, minimum fuel, cannot accept any additional en-route tracking delays." }, { s: "ATC", t: "FastAir 245, Roger, clear path straight-in approach runway 24R." } ], gap: { q: "Approach, FastAir 245, [___], cannot accept additional arrival delays.", a: "minimum fuel", opts: ["minimum fuel", "low endurance parameters", "reserve capacity state", "fuel critical profile"] }, syntax: { s: "Pilot", words: ["minimum", "fuel", "cannot", "accept", "additional", "delays"] } },
+            { id: 36, type: "Non-Routine", title: "Fuel Dump Path Setup", desc: "Requesting localized track space to discard excess weight variables before emergency landing structural parameters.", phrase: "fuel dumping", dialog: [ { s: "Pilot", t: "Control, FastAir 245, request flight sector clearance for fuel dumping to reach safe maximum landing weight limits." }, { s: "ATC", t: "FastAir 245, clear zone assigned over open water track, maintain Flight Level 120." } ], gap: { q: "Control, FastAir 245, request flight sector clearance for [___] tracking.", a: "fuel dumping", opts: ["fuel dumping", "weight jettisoning", "payload clearing", "venting operations"] }, syntax: { s: "Pilot", words: ["request", "clearance", "for", "fuel", "dumping", "to", "reduce", "weight"] } },
+            { id: 37, type: "Non-Routine", title: "Rejected Takeoff Acceleration Abort", desc: "Abrupt termination of departure roll before reaching decision speed V1.", phrase: "aborting takeoff", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, aborting takeoff runway 24R due to engine system control warnings." }, { s: "ATC", t: "FastAir 245, roger, stop straight ahead, emergency support teams monitoring." } ], gap: { q: "Tower, FastAir 245, [___] runway 24R due to control warnings.", a: "aborting takeoff", opts: ["aborting takeoff", "stopping roll profile", "canceling tracking launch", "braking acceleration"] }, syntax: { s: "Pilot", words: ["aborting", "takeoff", "runway", "24R", "due", "to", "warnings"] } },
+            { id: 38, type: "Non-Routine", title: "Brake Failure on Landing Rollout", desc: "Loss of wheel deceleration pressure during post-touchdown deceleration phase.", phrase: "no braking action", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, structural brake failure on touchdown rollout! No braking response, using emergency reverse thrust." }, { s: "ATC", t: "FastAir 245, emergency vehicles dispatched down parallel tracks, field clear." } ], gap: { q: "Tower, FastAir 245, brake failure on touchdown rollout! [___] action!", a: "no braking", opts: ["no braking", "deceleration failure", "loss of wheel stop", "skid configuration"] }, syntax: { s: "Pilot", words: ["brake", "failure", "on", "touchdown", "rollout", "no", "braking"] } },
+
+            // LEVEL 8: CRITICAL EMERGENCIES, COMPLEX ANOMALIES & SYSTEM FAILURES (COMPLEX PROCEDURAL)
+            { id: 39, type: "Non-Routine", title: "Stuck Flight Control Surface Fault", desc: "Mechanical linkage freeze event demanding asymmetric thrust vector compensation handling.", phrase: "stabilizer jam", dialog: [ { s: "Pilot", t: "Pan Pan Pan Pan Pan Pan, Control, FastAir 245, experiencing pitch stabilizer jam fault, configuring flight parameters using manual trim configurations, request long final tracking arc.", a: "stabilizer jam" }, { s: "ATC", t: "FastAir 245, copies emergency state, wide tracking pattern radius 25 miles clear of terrain structures." } ], gap: { q: "Pan Pan, Control, FastAir 245, experiencing pitch [___] fault, requesting wide pattern arc.", a: "stabilizer jam", opts: ["stabilizer jam", "actuator failure", "elevator cable snap", "surface control freeze"] }, syntax: { s: "Pilot", words: ["experiencing", "pitch", "stabilizer", "jam", "fault", "requesting", "wide", "arc"] } },
+            { id: 40, type: "Non-Routine", title: "Volcanic Ash Plume Entry", desc: "Unplanned intercept with hazardous abrasive glass particulate suspension fields.", phrase: "ash cloud", dialog: [ { s: "Pilot", t: "Control, FastAir 245, entered unforecasted volcanic ash cloud layer, windshield pitting, initiating immediate 180-degree escape turn." }, { s: "ATC", t: "FastAir 245, heading approved, descend immediate down clear of volcanic activity zone." } ], gap: { q: "Control, FastAir 245, entered unforecasted volcanic [___], windshield pitting.", a: "ash cloud layer", opts: ["ash cloud layer", "particulate flow", "sulfur smog front", "glass abrasive haze"] }, syntax: { s: "Pilot", words: ["entered", "unforecasted", "volcanic", "ash", "cloud", "layer"] } },
+            { id: 41, type: "Non-Routine", title: "TCAS Resolution Advisory Action", desc: "Pilot bypasses typical ATC logic to prioritize computer collision avoidance instructions.", phrase: "TCAS RA", dialog: [ { s: "Pilot", t: "Control, FastAir 245, TCAS RA descending, complying with guidance." }, { s: "ATC", t: "FastAir 245, Roger, traffic alert stands, report when rejoining." } ], gap: { q: "Control, FastAir 245, [___] descending, complying with machine guidance system.", a: "TCAS RA", opts: ["TCAS RA", "Collision Alert", "EGPWS warning", "Traffic Threat Action"] }, syntax: { s: "Pilot", words: ["TCAS", "RA", "descending", "complying", "with", "guidance"] } },
+            { id: 42, type: "Non-Routine", title: "Bomb Threat Sabotage Management", desc: "Ground dispatch processing anonymous malicious warning threats against flight assets.", phrase: "security threat", dialog: [ { s: "Pilot", t: "Center, FastAir 245, assigning emergency transponder code due to ground-relayed structural security threat profile." }, { s: "ATC", t: "FastAir 245, vectors to isolated remote parking apron section available on touchdown." } ], gap: { q: "Center, FastAir 245, assigning emergency code due to ground-relayed [___].", a: "security threat", opts: ["security threat", "sabotage alert", "bomb warning status", "hostile intervention"] }, syntax: { s: "Pilot", words: ["assigning", "emergency", "code", "due", "to", "security", "threat"] } },
+            { id: 43, type: "Non-Routine", title: "Total Hydraulic Failure Scenario", desc: "Degraded aerodynamic surface response requiring priority path planning.", phrase: "Pan Pan Pan Pan Pan Pan", dialog: [ { s: "Pilot", t: "Pan Pan Pan Pan Pan Pan, Control, FastAir 245, experiencing complete system hydraulic fluid leak, controls sluggish. Requesting long vector approach alignment profile." }, { s: "ATC", t: "FastAir 245, Radar copies Pan Pan, clear of all local regional traffic, maintain heading 270." } ], gap: { q: "[___], Control, FastAir 245, experiencing hydraulic fluid leak, controls sluggish.", a: "Pan Pan Pan Pan Pan Pan", opts: ["Pan Pan Pan Pan Pan Pan", "Mayday Mayday Mayday", "Securite Securite", "Priority Alert Vector"] }, syntax: { s: "Pilot", words: ["Pan", "Pan", "hydraulic", "leak", "controls", "sluggish"] } },
+            { id: 44, type: "Non-Routine", title: "Microburst Approach Escape Maneuver", desc: "Immediate configuration adjustment to break free from severe atmospheric downdrafts.", phrase: "windshear escape", dialog: [ { s: "Pilot", t: "Tower, FastAir 245, windshear alert triggered, executing escape maneuver, climbing max power." }, { s: "ATC", t: "FastAir 245, Roger, climb un-restricted to 4000 feet." } ], gap: { q: "Tower, FastAir 245, windshear alert triggered, executing [___].", a: "escape maneuver", opts: ["escape maneuver", "climb away escape", "max thrust dive away", "vertical correction profile"] }, syntax: { s: "Pilot", words: ["windshear", "alert", "triggered", "executing", "escape", "maneuver"] } },
+
+            // LEVEL 9: MAXIMUM EMERGENCIES & LIFE-CRITICAL MAYDAY SITUATIONS
+            { id: 45, type: "Non-Routine", title: "Rapid Cabin Depressurization", desc: "Immediate explosive descent protocol down to breathable structural bounds.", phrase: "emergency descent", dialog: [ { s: "Pilot", t: "Radar, FastAir 245, cabin depressurization, executing emergency descent down to Flight Level 100." }, { s: "ATC", t: "FastAir 245, Roger, emergency descent approved, regional altimeter 1011." } ], gap: { q: "Radar, FastAir 245, cabin depressurization, executing [___] down to 10,000.", a: "emergency descent", opts: ["emergency descent", "rapid drop vector", "expedited level conversion", "dive profile adjustment"] }, syntax: { s: "Pilot", words: ["cabin", "depressurization", "executing", "emergency", "descent"] } },
+            { id: 46, type: "Non-Routine", title: "Bird Strike Encounter", desc: "Sudden structural impact damage during departure initial climb.", phrase: "bird strike", dialog: [ { s: "Pilot", t: "Mayday Mayday Mayday, Departure, FastAir 245, bird strike on departure, losing thrust left engine! Maintaining runway heading, 3000 feet." }, { s: "ATC", t: "FastAir 245, Roger Mayday, emergency vectors stand ready, runway 24R clear for immediate return." } ], gap: { q: "Departure, FastAir 245, [___] on departure, losing thrust left engine!", a: "bird strike", opts: ["bird strike", "foreign body hazard", "canopy impact", "engine ingestion"] }, syntax: { s: "Pilot", words: ["bird", "strike", "on", "departure", "losing", "thrust"] } },
+            { id: 47, type: "Non-Routine", title: "In-Flight Engine Failure", desc: "Complete loss of propulsion power in an engine, declaring Mayday.", phrase: "Mayday Mayday Mayday", dialog: [ { s: "Pilot", t: "Mayday Mayday Mayday, Radar, FastAir 245, engine fire number 2, executing engine shutdown checklist, request immediate vector to nearest landing airfield." }, { s: "ATC", t: "FastAir 245, Roger Mayday, turn left heading 090, vector to nearest airport runway distance 15 miles." } ], gap: { q: "[___], Radar, FastAir 245, engine fire number 2, executing shutdown checklist.", a: "Mayday Mayday Mayday", opts: ["Mayday Mayday Mayday", "Pan Pan Pan Pan Pan Pan", "Emergency Emergency", "Attention Airspace Control"] }, syntax: { s: "Pilot", words: ["Mayday", "engine", "fire", "number", "2", "request", "vectors"] } },
+            { id: 48, type: "Non-Routine", title: "Mayday Fuel Crisis Allocation", desc: "Declaration when estimated usable onboard fuel drops below mandated safe levels.", phrase: "Mayday Fuel", dialog: [ { s: "Pilot", t: "Mayday Mayday Mayday, Tower, FastAir 245, Mayday Fuel, calculated structural engine dry-out timeline within 12 minutes." }, { s: "ATC", t: "FastAir 245, clear paths all traffic, runway 24R cleared to land immediately." } ], gap: { q: "Mayday Mayday Mayday, Tower, FastAir 245, [___], immediate path priority.", a: "Mayday Fuel", opts: ["Mayday Fuel", "empty tanks condition", "propulsion hazard state", "starvation profile"] }, syntax: { s: "Pilot", words: ["Mayday", "Fuel", "calculated", "engine", "dry-out", "12", "minutes"] } },
+            { id: 50, type: "Non-Routine", title: "Severe Evacuation Ground Command", desc: "Direct command sequence to abandon aircraft frame post-crash or fire risk.", phrase: "evacuation", dialog: [ { s: "Pilot", t: "Ground, FastAir 245, stopping on taxiway Bravo, initiating immediate passenger evacuation via evacuation slides." }, { s: "ATC", t: "FastAir 245, roger, emergency vehicles are on scene, rescue active." } ], gap: { q: "Ground, FastAir 245, stopping on Bravo, initiating immediate passenger [___].", a: "evacuation", opts: ["evacuation", "emergency egress", "airframe abandonment", "slide deployment sequence"] }, syntax: { s: "Pilot", words: ["initiating", "immediate", "passenger", "evacuation", "via", "slides"] } }
+        ];
+
+        // Global State Engine Variable Maps
+        let currentScenarioIndex = 0;
+        let globalMarks = 0;
+        let quizAttempts = 0;
+        let correctAttempts = 0;
+        
+        // Activity internal tracking buffers
+        let mixedUserOrder = [];
+        let wordOrderUserSequence = [];
+
+        // TTS Engine Config Properties
+        let speechSynth = window.speechSynthesis;
+        let voicesList = [];
+        let atcVoiceProfile = null;
+        let pilotVoiceProfile = null;
+
+        // Initialize Runtime Engine Components
+        window.addEventListener('DOMContentLoaded', () => {
+            initSpeechSynthesis();
+            buildScenarioSidebarMenu();
+            loadScenario(0);
+            updateGlobalScoreDashboard();
+        });
+
+        // Initialize and process valid Web Speech voice parameters
+        function initSpeechSynthesis() {
+            if (!speechSynth) return;
+            
+            function populateVoices() {
+                voicesList = speechSynth.getVoices();
+                // Prioritize natural English dialects (US, UK, Generic)
+                let englishVoices = voicesList.filter(v => v.lang.startsWith('en'));
+                
+                if (englishVoices.length > 0) {
+                    // Distribute across differentiated engine profiles if matched
+                    atcVoiceProfile = englishVoices.find(v => v.name.includes('Google') || v.name.includes('David') || v.name.includes('Male')) || englishVoices[0];
+                    pilotVoiceProfile = englishVoices.find(v => v.name.includes('Natural') || v.name.includes('Zira') || v.name.includes('Female')) || englishVoices[Math.min(1, englishVoices.length - 1)];
+                }
+                
+                buildVoiceProfileSelectorDOM();
+            }
+
+            populateVoices();
+            if (speechSynth.onvoiceschanged !== undefined) {
+                speechSynth.onvoiceschanged = populateVoices;
+            }
+        }
+
+        function buildVoiceProfileSelectorDOM() {
+            const atcSel = document.getElementById('atc-voice-select');
+            const pilotSel = document.getElementById('pilot-voice-select');
+            if(!atcSel || !pilotSel) return;
+
+            atcSel.innerHTML = '';
+            pilotSel.innerHTML = '';
+
+            voicesList.forEach((voice, index) => {
+                let opt1 = document.createElement('option');
+                opt1.value = index;
+                opt1.textContent = `${voice.name} (${voice.lang})`;
+                if(atcVoiceProfile && voice.name === atcVoiceProfile.name) opt1.selected = true;
+                atcSel.appendChild(opt1);
+
+                let opt2 = document.createElement('option');
+                opt2.value = index;
+                opt2.textContent = `${voice.name} (${voice.lang})`;
+                if(pilotVoiceProfile && voice.name === pilotVoiceProfile.name) opt2.selected = true;
+                pilotSel.appendChild(opt2);
+            });
+        }
+
+        function changeVoiceSettings() {
+            document.getElementById('voice-modal').classList.remove('hidden');
+        }
+
+        function closeVoiceModal() {
+            const atcIdx = document.getElementById('atc-voice-select').value;
+            const pilotIdx = document.getElementById('pilot-voice-select').value;
+            
+            if(voicesList[atcIdx]) atcVoiceProfile = voicesList[atcIdx];
+            if(voicesList[pilotIdx]) pilotVoiceProfile = voicesList[pilotIdx];
+
+            document.getElementById('voice-modal').classList.add('hidden');
+        }
+
+        // Build navigation sidebar items
+        function buildScenarioSidebarMenu() {
+            const container = document.getElementById('scenario-list');
+            container.innerHTML = '';
+
+            SCENARIOS.forEach((scen, idx) => {
+                let btn = document.createElement('button');
+                btn.id = `scen-item-${idx}`;
+                btn.onclick = () => loadScenario(idx);
+                btn.className = "w-full text-left p-3 rounded-lg flex flex-col space-y-1 transition border text-slate-300 border-transparent hover:bg-slate-800/60";
+                
+                let badgeClass = scen.type === "Routine" ? "bg-sky-500/10 text-sky-400 border-sky-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20";
+                
+                btn.innerHTML = `
+                    <div class="flex items-center justify-between w-full">
+                        <span class="text-xs font-mono text-slate-500 font-bold">#${String(scen.id).padStart(2, '0')}</span>
+                        <span class="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 border rounded ${badgeClass}">${scen.type}</span>
+                    </div>
+                    <span class="text-sm font-medium text-slate-200 truncate block">${scen.title}</span>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function filterScenarios() {
+            const val = document.getElementById('category-filter').value;
+            SCENARIOS.forEach((scen, idx) => {
+                const item = document.getElementById(`scen-item-${idx}`);
+                if (val === 'all' || scen.type === val) {
+                    item.classList.remove('hidden');
+                } else {
+                    item.classList.add('hidden');
+                }
+            });
+        }
+
+        // Master controller core logic mapping variables onto active displays
+        function loadScenario(index) {
+            // Stop any ongoing transmission outputs
+            stopAudio();
+
+            // Set current index tracking states
+            document.getElementById(`scen-item-${currentScenarioIndex}`).classList.remove('border-sky-500/40', 'bg-slate-800/80');
+            currentScenarioIndex = index;
+            document.getElementById(`scen-item-${currentScenarioIndex}`).classList.add('border-sky-500/40', 'bg-slate-800/80');
+
+            const item = SCENARIOS[index];
+
+            // Render Overview Component
+            const tag = document.getElementById('active-tag');
+            tag.textContent = item.type;
+            if(item.type === "Routine") {
+                tag.className = "text-xs font-semibold px-2 py-1 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase tracking-wider";
+            } else {
+                tag.className = "text-xs font-semibold px-2 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase tracking-wider";
+            }
+
+            document.getElementById('active-title').textContent = `${item.title}`;
+            document.getElementById('active-desc').textContent = item.desc;
+
+            // Load Sub-activity elements
+            setupDialogueTab(item);
+            setupGapFillTab(item);
+            setupMixedConversationTab(item);
+            setupWordOrderTab(item);
+
+            // Revert interface presentation context back to Read/Listen state default
+            switchTab('dialogue');
+        }
+
+        // Tab Switching Infrastructure Engine
+        function switchTab(target) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            
+            document.getElementById('tab-dialogue').className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition";
+            document.getElementById('tab-gapfill').className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition";
+            document.getElementById('tab-mixed').className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition";
+            document.getElementById('tab-wordorder').className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 focus:outline-none transition";
+
+            document.getElementById(`panel-${target}`).classList.remove('hidden');
+            document.getElementById(`tab-${target}`).className = `py-2.5 px-4 font-semibold text-sm border-b-2 ${target === 'dialogue' ? 'border-sky-500 text-sky-400' : target==='gapfill'?'border-sky-500 text-sky-400':target==='mixed'?'border-sky-500 text-sky-400':'border-purple-500 text-purple-400'} focus:outline-none transition`;
+        }
+
+        // Render Conversation Stack Markup Templates
+        function setupDialogueTab(item) {
+            const box = document.getElementById('dialogue-box');
+            box.innerHTML = '';
+
+            item.dialog.forEach((line, lineIdx) => {
+                let isATC = line.s === "ATC";
+                let row = document.createElement('div');
+                row.className = `flex w-full items-start space-x-3 ${isATC ? 'justify-start' : 'justify-end'}`;
+
+                let blockMarkup = `
+                    <div class="flex flex-col max-w-xl ${isATC ? 'items-start' : 'items-end'}">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <span class="text-xs uppercase font-bold tracking-wider ${isATC ? 'text-sky-400' : 'text-emerald-400'}">${line.s}</span>
+                            <button onclick="playIndividualLine(${currentScenarioIndex}, ${lineIdx})" class="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 hover:text-white transition">🔊 Say Line</button>
+                        </div>
+                        <div id="msg-bubble-${lineIdx}" class="rounded-xl px-4 py-3 border tracking-wide transition shadow-md radio-static ${isATC ? 'bg-slate-900 border-slate-800 text-slate-200 rounded-tl-none' : 'bg-slate-900 border-slate-800 text-slate-200 rounded-tr-none'}">
+                            <p class="text-sm font-medium leading-relaxed mono-font">${line.t}</p>
+                        </div>
+                    </div>
+                `;
+                row.innerHTML = blockMarkup;
+                box.appendChild(row);
+            });
+        }
+
+        // Text Processing Engine to split numbers into digits and expand mixed names with NATO phonetics
+        function prepareTextForSpeech(text) {
+            let altitudes = [];
+            // Match "Flight Level XXX" or "XXXX feet" (case-insensitive) to treat them as protected chunks
+            let altRegex = /(Flight Level \d+|\d+\s*feet)/gi;
+            
+            let processedText = text.replace(altRegex, (match) => {
+                altitudes.push(match);
+                return ` __ALTITUDE_${altitudes.length - 1}__ `;
+            });
+
+            // Dictionary for NATO phonetic alphabet expansions
+            const natoAlphabet = {
+                'A': 'Alpha', 'B': 'Bravo', 'C': 'Charlie', 'D': 'Delta', 'E': 'Echo',
+                'F': 'Foxtrot', 'G': 'Golf', 'H': 'Hotel', 'I': 'India', 'J': 'Juliett',
+                'K': 'Kilo', 'L': 'Lima', 'M': 'Mike', 'N': 'November', 'O': 'Oscar',
+                'P': 'Papa', 'Q': 'Quebec', 'R': 'Romeo', 'S': 'Sierra', 'T': 'Tango',
+                'U': 'Uniform', 'V': 'Victor', 'W': 'Whiskey', 'X': 'X-ray', 'Y': 'Yankee',
+                'Z': 'Zulu'
+            };
+
+            // Identify tokens that combine both letters and digits together (e.g. A12, 24R)
+            processedText = processedText.replace(/\b([A-Za-z\d]+)\b/g, (token) => {
+                const hasLetter = /[A-Za-z]/.test(token);
+                const hasDigit = /\d/.test(token);
+                
+                // When mixed alphanumeric syntax is detected, expand letters via NATO phonetics
+                if (hasLetter && hasDigit) {
+                    return token.split('').map(char => {
+                        if (/[A-Za-z]/.test(char)) {
+                            return ' ' + (natoAlphabet[char.toUpperCase()] || char) + ' ';
+                        } else if (/\d/.test(char)) {
+                            return ' ' + char + ' ';
+                        }
+                        return char;
+                    }).join('');
+                }
+                return token;
+            });
+            
+            // Format decimals (like 121.8) into spaced strings separated by "point"
+            processedText = processedText.replace(/(\d+)\.(\d+)/g, (match, p1, p2) => {
+                return `${p1.split('').join(' ')} point ${p2.split('').join(' ')}`;
+            });
+            
+            // Convert any remaining un-spaced sequence of numbers to separate digits
+            processedText = processedText.replace(/\d+/g, (num) => {
+                return num.split('').join(' ');
+            });
+            
+            // Restore protected altitudes seamlessly
+            processedText = processedText.replace(/__ALTITUDE_(\d+)__/g, (match, index) => {
+                return altitudes[parseInt(index)];
+            });
+            
+            return processedText;
+        }
+
+        // Speech Engine Sequencer Implementation
+        function playFullDialogue() {
+            stopAudio();
+            let scenario = SCENARIOS[currentScenarioIndex];
+            let linePointer = 0;
+
+            function speakNext() {
+                if (linePointer >= scenario.dialog.length) return;
+                highlightSpeechBubble(linePointer);
+                
+                let currentLine = scenario.dialog[linePointer];
+                let speechText = prepareTextForSpeech(currentLine.t);
+                let utter = new SpeechSynthesisUtterance(speechText);
+                
+                // Map active voices from parameters
+                utter.voice = currentLine.s === "ATC" ? atcVoiceProfile : pilotVoiceProfile;
+                utter.pitch = parseFloat(document.getElementById('voice-pitch').value);
+                utter.rate = parseFloat(document.getElementById('voice-rate').value);
+
+                utter.onend = () => {
+                    clearSpeechBubbleHighlights();
+                    linePointer++;
+                    speakNext();
+                };
+                utter.onerror = () => clearSpeechBubbleHighlights();
+
+                speechSynth.speak(utter);
+            }
+            speakNext();
+        }
+
+        function playIndividualLine(scenIdx, lineIdx) {
+            stopAudio();
+            highlightSpeechBubble(lineIdx);
+            let currentLine = SCENARIOS[scenIdx].dialog[lineIdx];
+            let speechText = prepareTextForSpeech(currentLine.t);
+            let utter = new SpeechSynthesisUtterance(speechText);
+            
+            utter.voice = currentLine.s === "ATC" ? atcVoiceProfile : pilotVoiceProfile;
+            utter.pitch = parseFloat(document.getElementById('voice-pitch').value);
+            utter.rate = parseFloat(document.getElementById('voice-rate').value);
+
+            utter.onend = () => clearSpeechBubbleHighlights();
+            utter.onerror = () => clearSpeechBubbleHighlights();
+
+            speechSynth.speak(utter);
+        }
+
+        function stopAudio() {
+            if (speechSynth) {
+                speechSynth.cancel();
+            }
+            clearSpeechBubbleHighlights();
+        }
+
+        function highlightSpeechBubble(idx) {
+            clearSpeechBubbleHighlights();
+            const el = document.getElementById(`msg-bubble-${idx}`);
+            if(el) el.classList.add('border-sky-500', 'bg-slate-850/80', 'ring-2', 'ring-sky-500/20');
+        }
+
+        function removeSpeechBubbleHighlights() {
+            SCENARIOS[currentScenarioIndex].dialog.forEach((_, idx) => {
+                const el = document.getElementById(`msg-bubble-${idx}`);
+                if(el) el.classList.remove('border-sky-500', 'bg-slate-850/80', 'ring-2', 'ring-sky-500/20');
+            });
+        }
+        
+        // Alias function mapping to clear highlight loops safely
+        function clearSpeechBubbleHighlights() {
+            removeSpeechBubbleHighlights();
+        }
+
+        // TAB 2 Engine: Multiple Choice Gap Fill
+        function setupGapFillTab(item) {
+            document.getElementById('gapfill-sentence').textContent = item.gap.q;
+            const optionsBox = document.getElementById('gapfill-options');
+            optionsBox.innerHTML = '';
+
+            const feedback = document.getElementById('gapfill-feedback');
+            feedback.className = "hidden rounded-lg p-4 mb-4";
+
+            // Scramble choices array using sort mapping offsets
+            let choices = [...item.gap.opts].sort(() => Math.random() - 0.5);
+
+            choices.forEach(opt => {
+                let btn = document.createElement('button');
+                btn.onclick = () => verifyGapFillSelection(btn, opt, item.gap.a);
+                btn.className = "w-full text-left bg-slate-800 border border-slate-700 hover:border-slate-500 text-slate-200 p-4 rounded-xl text-sm font-medium tracking-wide transition transform active:scale-98 shadow-sm";
+                btn.textContent = opt;
+                optionsBox.appendChild(btn);
+            });
+        }
+
+        function verifyGapFillSelection(selectedBtn, chosenOpt, correctAns) {
+            const feedback = document.getElementById('gapfill-feedback');
+            feedback.classList.remove('hidden');
+            quizAttempts++;
+
+            // Lock all action choice instances post selection tracking
+            const buttons = document.getElementById('gapfill-options').getElementsByTagName('button');
+            for(let b of buttons) b.disabled = true;
+
+            if (chosenOpt === correctAns) {
+                selectedBtn.className = "w-full text-left bg-emerald-950 border-2 border-emerald-500 text-emerald-200 p-4 rounded-xl text-sm font-bold tracking-wide transition";
+                feedback.className = "rounded-lg p-4 mb-4 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-sm font-medium";
+                feedback.innerHTML = `🛡️ <strong>Correct Phraseology Verified (+10 Marks):</strong> Transmission meets absolute structural standard parameters.`;
+                globalMarks += 10;
+                correctAttempts++;
+            } else {
+                selectedBtn.className = "w-full text-left bg-rose-950 border-2 border-rose-500 text-rose-200 p-4 rounded-xl text-sm font-bold tracking-wide transition";
+                feedback.className = "rounded-lg p-4 mb-4 bg-rose-500/10 text-rose-400 border border-rose-500/20 text-sm font-medium";
+                feedback.innerHTML = `⚠️ <strong>Deviation Detected (0 Marks):</strong> Core syntax target required: <em>"${correctAns}"</em>. Review transmission workflow parameters.`;
+            }
+            updateGlobalScoreDashboard();
+        }
+
+        // TAB 3 Engine: Mixed Sequence Chronology Assembler
+        function setupMixedConversationTab(item) {
+            mixedUserOrder = [];
+            document.getElementById('mixed-feedback').className = "hidden rounded-lg p-4 mt-4";
+            document.getElementById('mixed-target').innerHTML = '';
+
+            // Generate deep copy maps tracking index fields
+            let indexedPool = item.dialog.map((line, index) => ({ originalIndex: index, ...line }));
+            // Mix arrays layout sequence tracking logic
+            indexedPool.sort(() => Math.random() - 0.5);
+
+            const poolBox = document.getElementById('mixed-pool');
+            poolBox.innerHTML = '';
+
+            indexedPool.forEach(chunk => {
+                let card = document.createElement('button');
+                card.id = `mixed-chip-${chunk.originalIndex}`;
+                card.onclick = () => actionMoveMixedChipToTarget(chunk);
+                card.className = "w-full text-left bg-slate-800 border border-slate-700 hover:bg-slate-750 text-slate-300 p-3 rounded-lg text-xs font-mono tracking-wide transition block text-left";
+                card.innerHTML = `<strong class="${chunk.s === 'ATC' ? 'text-sky-400':'text-emerald-400'}">[${chunk.s}]</strong> ${chunk.t}`;
+                poolBox.appendChild(card);
+            });
+        }
+
+        function actionMoveMixedChipToTarget(chunk) {
+            const srcChip = document.getElementById(`mixed-chip-${chunk.originalIndex}`);
+            if(!srcChip) return;
+            srcChip.classList.add('opacity-30', 'pointer-events-none');
+
+            mixedUserOrder.push(chunk);
+
+            const targetBox = document.getElementById('mixed-target');
+            let itemRow = document.createElement('div');
+            itemRow.className = "bg-slate-900 border border-slate-800 text-slate-300 p-2.5 rounded-lg text-xs font-mono flex items-center space-x-2 animate-fadeIn";
+            itemRow.innerHTML = `<span class="bg-slate-800 text-slate-400 font-bold px-1.5 py-0.5 rounded">${mixedUserOrder.length}</span> <strong class="${chunk.s==='ATC'?'text-sky-400':'text-emerald-400'}">[${chunk.s}]</strong> <span>${chunk.t}</span>`;
+            
+            targetBox.appendChild(itemRow);
+        }
+
+        function resetMixedQuiz() {
+            setupMixedConversationTab(SCENARIOS[currentScenarioIndex]);
+        }
+
+        function checkMixedQuiz() {
+            const item = SCENARIOS[currentScenarioIndex];
+            const feedback = document.getElementById('mixed-feedback');
+            feedback.classList.remove('hidden');
+
+            if(mixedUserOrder.length !== item.dialog.length) {
+                feedback.className = "rounded-lg p-4 mt-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-medium";
+                feedback.innerHTML = "⚠️ Complete assigning all workflow components down the timeline target grid before parsing checking evaluations.";
+                return;
+            }
+
+            quizAttempts++;
+            let structuralIntegrityMaintained = true;
+            for(let i=0; i < item.dialog.length; i++) {
+                if(mixedUserOrder[i].originalIndex !== i) {
+                    structuralIntegrityMaintained = false;
+                    break;
+                }
+            }
+
+            if(structuralIntegrityMaintained) {
+                feedback.className = "rounded-lg p-4 mt-4 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-sm font-medium";
+                feedback.innerHTML = "🛡️ <strong>Sequence Verification Successful (+20 Marks):</strong> Transmission sequence perfectly mirrors standard terminal operation profiles.";
+                globalMarks += 20;
+                correctAttempts++;
+            } else {
+                feedback.className = "rounded-lg p-4 mt-4 bg-rose-500/10 text-rose-400 border border-rose-500/20 text-sm font-medium";
+                feedback.innerHTML = "⚠️ <strong>Procedural Sequencing Breakdown (0 Marks):</strong> Components misplaced relative to basic communication handshakes. Reset sequence to re-attempt clearance pipelines.";
+            }
+            updateGlobalScoreDashboard();
+        }
+
+        // TAB 4 Engine: Transmission Syntax Unscrambler
+        function setupWordOrderTab(item) {
+            wordOrderUserSequence = [];
+            document.getElementById('wordorder-feedback').className = "hidden rounded-lg p-4 mt-4";
+            document.getElementById('wordorder-target').innerHTML = '';
+            
+            const badge = document.getElementById('wordorder-speaker-badge');
+            badge.innerHTML = `<span class="text-xs uppercase font-bold tracking-wider ${item.syntax.s === 'ATC' ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20':'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'} px-2 py-1 rounded">Target Transmission Actor: ${item.syntax.s}</span>`;
+
+            let shuffledWords = [...item.syntax.words].sort(() => Math.random() - 0.5);
+            const poolBox = document.getElementById('wordorder-pool');
+            poolBox.innerHTML = '';
+
+            shuffledWords.forEach((word, index) => {
+                let token = document.createElement('button');
+                token.id = `word-chip-${index}`;
+                token.onclick = () => {
+                    token.classList.add('hidden');
+                    appendWordToTarget(word, index);
+                };
+                token.className = "bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-1.5 text-xs font-mono transition transform active:scale-95";
+                token.textContent = word;
+                poolBox.appendChild(token);
+            });
+        }
+
+        function appendWordToTarget(word, originalPoolId) {
+            wordOrderUserSequence.push({ word, poolId: originalPoolId });
+            const targetBox = document.getElementById('wordorder-target');
+
+            let chip = document.createElement('span');
+            chip.className = "bg-purple-950/60 border border-purple-500/40 text-purple-300 font-mono text-xs px-2.5 py-1.5 rounded-lg flex items-center space-x-1 animate-scaleIn shadow-sm";
+            chip.textContent = word;
+
+            targetBox.appendChild(chip);
+        }
+
+        function resetWordOrderQuiz() {
+            setupWordOrderTab(SCENARIOS[currentScenarioIndex]);
+        }
+
+        function checkWordOrderQuiz() {
+            const item = SCENARIOS[currentScenarioIndex];
+            const feedback = document.getElementById('wordorder-feedback');
+            feedback.classList.remove('hidden');
+
+            if(wordOrderUserSequence.length !== item.syntax.words.length) {
+                feedback.className = "rounded-lg p-4 mt-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-medium";
+                feedback.innerHTML = "⚠️ Gather and link all syntactic component tokens from the resource pool grid before executing evaluation checks.";
+                return;
+            }
+
+            quizAttempts++;
+            let syntaxValidationPassed = true;
+            for(let i=0; i < item.syntax.words.length; i++) {
+                if(wordOrderUserSequence[i].word !== item.syntax.words[i]) {
+                    syntaxValidationPassed = false;
+                    break;
+                }
+            }
+
+            if(syntaxValidationPassed) {
+                feedback.className = "rounded-lg p-4 mt-4 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-sm font-medium";
+                feedback.innerHTML = "🛡️ <strong>Aeronautical Syntax Validated (+15 Marks):</strong> Phraseology syntax fully complies with standard transmission specifications.";
+                globalMarks += 15;
+                correctAttempts++;
+            } else {
+                feedback.className = "rounded-lg p-4 mt-4 bg-rose-500/10 text-rose-400 border border-rose-500/20 text-sm font-medium";
+                feedback.innerHTML = `⚠️ <strong>Syntax Arrangement Error (0 Marks):</strong> Transmission syntax fails structurally. Expected sequence profile output: <br><code class="block bg-slate-950 p-2 rounded mt-2 text-slate-300 font-mono text-xs">${item.syntax.words.join(' ')}</code>`;
+            }
+            updateGlobalScoreDashboard();
+        }
+
+        // Dashboard Telemetry Calculations Update Loop
+        function updateGlobalScoreDashboard() {
+            document.getElementById('global-score').textContent = globalMarks;
+            
+            let accuracy = quizAttempts === 0 ? 100 : Math.round((correctAttempts / quizAttempts) * 100);
+            document.getElementById('global-accuracy').textContent = `${accuracy}%`;
+            
+            // Count unique passed scenarios completed in tracking session context arrays
+            let itemsCount = Math.min(50, Math.floor(quizAttempts / 3)); // Mock tracking calculation scaling
+            document.getElementById('global-progress').textContent = `${itemsCount} / 50`;
+        }
+    </script>
+</body>
+</html>
