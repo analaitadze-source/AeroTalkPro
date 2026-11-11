@@ -126,7 +126,7 @@
                     </div>
                     <div class="text-xs text-slate-400 flex items-center space-x-2">
                         <span class="inline-block w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                        <span>Web Speech Engine Active ("Point" Rule Implemented)</span>
+                        <span>Web Speech + Radio Static/Hum Active ("Point" Rule Implemented)</span>
                     </div>
                 </div>
 
@@ -209,15 +209,15 @@
     <div id="voice-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-xl p-6 shadow-2xl">
             <h3 class="text-lg font-bold text-white mb-2">Aviation Voice Synthesizer Configuration</h3>
-            <p class="text-xs text-slate-400 mb-4">Map available runtime text-to-speech audio outputs to unique speaker paths for immersive simulation training.</p>
+            <p class="text-xs text-slate-400 mb-4">Only non-Microsoft English voices are available. Google UK male and female voices are preferred when installed; other installed English accents are also selectable.</p>
             
             <div class="space-y-4">
                 <div>
-                    <label for="atc-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Air Traffic Control Voice Profile</label>
+                    <label for="atc-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Air Traffic Control Voice Profile (Male Preferred)</label>
                     <select id="atc-voice-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500"></select>
                 </div>
                 <div>
-                    <label for="pilot-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Pilot/Flight Deck Voice Profile</label>
+                    <label for="pilot-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Pilot/Flight Deck Voice Profile (Female Preferred)</label>
                     <select id="pilot-voice-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500"></select>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
@@ -325,6 +325,9 @@
         let voicesList = [];
         let atcVoiceProfile = null;
         let pilotVoiceProfile = null;
+        let radioAudioContext = null;
+        let radioNoiseGain = null;
+        let radioHumGain = null;
 
         // Initialize Runtime Engine Components
         window.addEventListener('DOMContentLoaded', () => {
@@ -339,15 +342,27 @@
             if (!speechSynth) return;
             
             function populateVoices() {
-                voicesList = speechSynth.getVoices();
-                // Prioritize natural English dialects (US, UK, Generic)
-                let englishVoices = voicesList.filter(v => v.lang.startsWith('en'));
-                
-                if (englishVoices.length > 0) {
-                    // Distribute across differentiated engine profiles if matched
-                    atcVoiceProfile = englishVoices.find(v => v.name.includes('Google') || v.name.includes('David') || v.name.includes('Male')) || englishVoices[0];
-                    pilotVoiceProfile = englishVoices.find(v => v.name.includes('Natural') || v.name.includes('Zira') || v.name.includes('Female')) || englishVoices[Math.min(1, englishVoices.length - 1)];
-                }
+                const previousAtcVoice = atcVoiceProfile;
+                const previousPilotVoice = pilotVoiceProfile;
+                voicesList = speechSynth.getVoices().filter(voice =>
+                    voice.lang.toLowerCase().startsWith('en') &&
+                    !/microsoft/i.test(`${voice.name} ${voice.voiceURI}`)
+                );
+                const accentOrder = ['en-GB', 'en-US', 'en-AU', 'en-IE', 'en-CA', 'en-IN', 'en-NZ'];
+                voicesList.sort((left, right) => {
+                    const googleUkOrder = Number(!isGoogleUkVoice(left)) - Number(!isGoogleUkVoice(right));
+                    if (googleUkOrder) return googleUkOrder;
+                    const leftAccentOrder = accentOrder.indexOf(left.lang);
+                    const rightAccentOrder = accentOrder.indexOf(right.lang);
+                    return (leftAccentOrder < 0 ? accentOrder.length : leftAccentOrder) -
+                        (rightAccentOrder < 0 ? accentOrder.length : rightAccentOrder) ||
+                        left.name.localeCompare(right.name);
+                });
+
+                atcVoiceProfile = voicesList.find(voice => previousAtcVoice && voice.name === previousAtcVoice.name) ||
+                    findPreferredVoice('male');
+                pilotVoiceProfile = voicesList.find(voice => previousPilotVoice && voice.name === previousPilotVoice.name) ||
+                    findPreferredVoice('female', atcVoiceProfile);
                 
                 buildVoiceProfileSelectorDOM();
             }
@@ -358,6 +373,28 @@
             }
         }
 
+        function isGoogleUkVoice(voice) {
+            return voice.lang.toLowerCase() === 'en-gb' && /google/i.test(voice.name);
+        }
+
+        function findPreferredVoice(gender, alternateVoice) {
+            const genderPattern = gender === 'male' ? /\bmale\b/i : /\bfemale\b/i;
+            return voicesList.find(voice => voice !== alternateVoice && isGoogleUkVoice(voice) && genderPattern.test(voice.name)) ||
+                voicesList.find(voice => voice !== alternateVoice && genderPattern.test(voice.name)) ||
+                voicesList.find(voice => voice !== alternateVoice && isGoogleUkVoice(voice)) ||
+                voicesList.find(voice => voice !== alternateVoice) ||
+                alternateVoice ||
+                null;
+        }
+
+        function hasNonMicrosoftVoiceProfiles() {
+            const isAllowedVoice = voice => voice && !/microsoft/i.test(`${voice.name} ${voice.voiceURI}`);
+            if (isAllowedVoice(atcVoiceProfile) && isAllowedVoice(pilotVoiceProfile)) return true;
+
+            alert('No non-Microsoft English voices are available in this browser. Install or enable another English voice, then reload the page.');
+            return false;
+        }
+
         function buildVoiceProfileSelectorDOM() {
             const atcSel = document.getElementById('atc-voice-select');
             const pilotSel = document.getElementById('pilot-voice-select');
@@ -365,6 +402,17 @@
 
             atcSel.innerHTML = '';
             pilotSel.innerHTML = '';
+
+            if (voicesList.length === 0) {
+                [atcSel, pilotSel].forEach(select => {
+                    const option = document.createElement('option');
+                    option.textContent = 'No non-Microsoft English voices available';
+                    option.disabled = true;
+                    option.selected = true;
+                    select.appendChild(option);
+                });
+                return;
+            }
 
             voicesList.forEach((voice, index) => {
                 let opt1 = document.createElement('option');
@@ -563,13 +611,78 @@
         }
 
         // Speech Engine Sequencer Implementation
+        function startRadioHumming() {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+
+            if (!radioAudioContext) {
+                radioAudioContext = new AudioContextClass();
+
+                const noiseBuffer = radioAudioContext.createBuffer(1, radioAudioContext.sampleRate * 2, radioAudioContext.sampleRate);
+                const noiseData = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < noiseData.length; i++) {
+                    noiseData[i] = Math.random() * 2 - 1;
+                }
+
+                const noiseSource = radioAudioContext.createBufferSource();
+                noiseSource.buffer = noiseBuffer;
+                noiseSource.loop = true;
+
+                const radioFilter = radioAudioContext.createBiquadFilter();
+                radioFilter.type = "bandpass";
+                radioFilter.frequency.value = 1600;
+                radioFilter.Q.value = 0.7;
+
+                radioNoiseGain = radioAudioContext.createGain();
+                radioNoiseGain.gain.value = 0;
+                noiseSource.connect(radioFilter);
+                radioFilter.connect(radioNoiseGain);
+                radioNoiseGain.connect(radioAudioContext.destination);
+                noiseSource.start();
+
+                const humOscillator = radioAudioContext.createOscillator();
+                humOscillator.type = "sine";
+                humOscillator.frequency.value = 60;
+                radioHumGain = radioAudioContext.createGain();
+                radioHumGain.gain.value = 0;
+                humOscillator.connect(radioHumGain);
+                radioHumGain.connect(radioAudioContext.destination);
+                humOscillator.start();
+            }
+
+            if (radioAudioContext.state === "suspended") {
+                radioAudioContext.resume().catch(error => console.error("Radio audio could not start:", error));
+            }
+
+            const now = radioAudioContext.currentTime;
+            radioNoiseGain.gain.cancelScheduledValues(now);
+            radioNoiseGain.gain.setTargetAtTime(0.012, now, 0.04);
+            radioHumGain.gain.cancelScheduledValues(now);
+            radioHumGain.gain.setTargetAtTime(0.0012, now, 0.04);
+        }
+
+        function stopRadioHumming() {
+            if (!radioAudioContext || !radioNoiseGain || !radioHumGain) return;
+
+            const now = radioAudioContext.currentTime;
+            radioNoiseGain.gain.cancelScheduledValues(now);
+            radioNoiseGain.gain.setTargetAtTime(0, now, 0.04);
+            radioHumGain.gain.cancelScheduledValues(now);
+            radioHumGain.gain.setTargetAtTime(0, now, 0.04);
+        }
+
         function playFullDialogue() {
             stopAudio();
+            if (!hasNonMicrosoftVoiceProfiles()) return;
+            startRadioHumming();
             let scenario = SCENARIOS[currentScenarioIndex];
             let linePointer = 0;
 
             function speakNext() {
-                if (linePointer >= scenario.dialog.length) return;
+                if (linePointer >= scenario.dialog.length) {
+                    stopRadioHumming();
+                    return;
+                }
                 highlightSpeechBubble(linePointer);
                 
                 let currentLine = scenario.dialog[linePointer];
@@ -586,7 +699,10 @@
                     linePointer++;
                     speakNext();
                 };
-                utter.onerror = () => clearSpeechBubbleHighlights();
+                utter.onerror = () => {
+                    stopRadioHumming();
+                    clearSpeechBubbleHighlights();
+                };
 
                 speechSynth.speak(utter);
             }
@@ -595,6 +711,7 @@
 
         function playIndividualLine(scenIdx, lineIdx) {
             stopAudio();
+            if (!hasNonMicrosoftVoiceProfiles()) return;
             highlightSpeechBubble(lineIdx);
             let currentLine = SCENARIOS[scenIdx].dialog[lineIdx];
             let speechText = prepareTextForSpeech(currentLine.t);
@@ -604,9 +721,16 @@
             utter.pitch = parseFloat(document.getElementById('voice-pitch').value);
             utter.rate = parseFloat(document.getElementById('voice-rate').value);
 
-            utter.onend = () => clearSpeechBubbleHighlights();
-            utter.onerror = () => clearSpeechBubbleHighlights();
+            utter.onend = () => {
+                stopRadioHumming();
+                clearSpeechBubbleHighlights();
+            };
+            utter.onerror = () => {
+                stopRadioHumming();
+                clearSpeechBubbleHighlights();
+            };
 
+            startRadioHumming();
             speechSynth.speak(utter);
         }
 
@@ -614,6 +738,7 @@
             if (speechSynth) {
                 speechSynth.cancel();
             }
+            stopRadioHumming();
             clearSpeechBubbleHighlights();
         }
 
