@@ -209,15 +209,15 @@
     <div id="voice-modal" class="hidden fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-xl p-6 shadow-2xl">
             <h3 class="text-lg font-bold text-white mb-2">Aviation Voice Synthesizer Configuration</h3>
-            <p class="text-xs text-slate-400 mb-4">Only non-Microsoft English voices are available. Google UK male and female voices are preferred when installed; other installed English accents are also selectable.</p>
+            <p class="text-xs text-slate-400 mb-4">Only non-Microsoft English voices are available. Google UK male and female voices are preferred; American and Australian accents are prioritized next when installed. Changing a voice plays a radio-check preview with hiss and hum.</p>
             
             <div class="space-y-4">
                 <div>
-                    <label for="atc-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Air Traffic Control Voice Profile (Male Preferred)</label>
+                    <label for="atc-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Air Traffic Control Voice Profile (Female Preferred)</label>
                     <select id="atc-voice-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500"></select>
                 </div>
                 <div>
-                    <label for="pilot-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Pilot/Flight Deck Voice Profile (Female Preferred)</label>
+                    <label for="pilot-voice-select" class="block text-xs font-semibold text-slate-300 uppercase mb-1">Pilot/Flight Deck Voice Profile (Male Preferred)</label>
                     <select id="pilot-voice-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 focus:ring-2 focus:ring-sky-500"></select>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
@@ -348,21 +348,21 @@
                     voice.lang.toLowerCase().startsWith('en') &&
                     !/microsoft/i.test(`${voice.name} ${voice.voiceURI}`)
                 );
-                const accentOrder = ['en-GB', 'en-US', 'en-AU', 'en-IE', 'en-CA', 'en-IN', 'en-NZ'];
+                const accentOrder = ['en-gb', 'en-us', 'en-au', 'en-ie', 'en-ca', 'en-in', 'en-nz'];
                 voicesList.sort((left, right) => {
                     const googleUkOrder = Number(!isGoogleUkVoice(left)) - Number(!isGoogleUkVoice(right));
                     if (googleUkOrder) return googleUkOrder;
-                    const leftAccentOrder = accentOrder.indexOf(left.lang);
-                    const rightAccentOrder = accentOrder.indexOf(right.lang);
+                    const leftAccentOrder = accentOrder.indexOf(left.lang.replace('_', '-').toLowerCase());
+                    const rightAccentOrder = accentOrder.indexOf(right.lang.replace('_', '-').toLowerCase());
                     return (leftAccentOrder < 0 ? accentOrder.length : leftAccentOrder) -
                         (rightAccentOrder < 0 ? accentOrder.length : rightAccentOrder) ||
                         left.name.localeCompare(right.name);
                 });
 
                 atcVoiceProfile = voicesList.find(voice => previousAtcVoice && voice.name === previousAtcVoice.name) ||
-                    findPreferredVoice('male');
+                    findPreferredVoice('female');
                 pilotVoiceProfile = voicesList.find(voice => previousPilotVoice && voice.name === previousPilotVoice.name) ||
-                    findPreferredVoice('female', atcVoiceProfile);
+                    findPreferredVoice('male', atcVoiceProfile);
                 
                 buildVoiceProfileSelectorDOM();
             }
@@ -374,7 +374,21 @@
         }
 
         function isGoogleUkVoice(voice) {
-            return voice.lang.toLowerCase() === 'en-gb' && /google/i.test(voice.name);
+            return voice.lang.replace('_', '-').toLowerCase() === 'en-gb' && /google/i.test(voice.name);
+        }
+
+        function getVoiceLocaleLabel(voice) {
+            const locale = voice.lang.replace('_', '-').toLowerCase();
+            const accentLabels = {
+                'en-gb': 'English (UK)',
+                'en-us': 'English (United States)',
+                'en-au': 'English (Australia)',
+                'en-ie': 'English (Ireland)',
+                'en-ca': 'English (Canada)',
+                'en-in': 'English (India)',
+                'en-nz': 'English (New Zealand)'
+            };
+            return accentLabels[locale] || voice.lang;
         }
 
         function findPreferredVoice(gender, alternateVoice) {
@@ -417,16 +431,34 @@
             voicesList.forEach((voice, index) => {
                 let opt1 = document.createElement('option');
                 opt1.value = index;
-                opt1.textContent = `${voice.name} (${voice.lang})`;
+                opt1.textContent = `${voice.name} (${getVoiceLocaleLabel(voice)})`;
                 if(atcVoiceProfile && voice.name === atcVoiceProfile.name) opt1.selected = true;
                 atcSel.appendChild(opt1);
 
                 let opt2 = document.createElement('option');
                 opt2.value = index;
-                opt2.textContent = `${voice.name} (${voice.lang})`;
+                opt2.textContent = `${voice.name} (${getVoiceLocaleLabel(voice)})`;
                 if(pilotVoiceProfile && voice.name === pilotVoiceProfile.name) opt2.selected = true;
                 pilotSel.appendChild(opt2);
             });
+
+            atcSel.onchange = () => previewVoiceProfile(atcSel);
+            pilotSel.onchange = () => previewVoiceProfile(pilotSel);
+        }
+
+        function previewVoiceProfile(select) {
+            const voice = voicesList[Number(select.value)];
+            if (!voice || /microsoft/i.test(`${voice.name} ${voice.voiceURI}`)) return;
+
+            stopAudio();
+            const utter = new SpeechSynthesisUtterance('Radio check. One, two, three.');
+            utter.voice = voice;
+            utter.pitch = parseFloat(document.getElementById('voice-pitch').value);
+            utter.rate = parseFloat(document.getElementById('voice-rate').value);
+            utter.onend = stopRadioHumming;
+            utter.onerror = stopRadioHumming;
+            startRadioHumming();
+            speechSynth.speak(utter);
         }
 
         function changeVoiceSettings() {
